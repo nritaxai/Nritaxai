@@ -46,7 +46,11 @@ export function AIChat({ onRequireLogin }: AIChatProps) {
   useEffect(() => {
     const syncAuth = () => setIsAuthenticated(Boolean(localStorage.getItem("token")));
     window.addEventListener("storage", syncAuth);
-    return () => window.removeEventListener("storage", syncAuth);
+    window.addEventListener("auth-changed", syncAuth);
+    return () => {
+      window.removeEventListener("storage", syncAuth);
+      window.removeEventListener("auth-changed", syncAuth);
+    };
   }, []);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -118,6 +122,33 @@ export function AIChat({ onRequireLogin }: AIChatProps) {
     { label: "AI Response Summary", value: latestAIMessage.substring(0, 300) },
   ];
 
+  if (!isAuthenticated) {
+    return (
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
+        <div className="text-center mb-12">
+          <Badge className="mb-4" variant="outline">AI-Powered</Badge>
+          <h2 className="text-3xl sm:text-4xl mb-4">Chat with AI Tax Assistant</h2>
+          <p className="text-lg text-gray-600 max-w-2xl mx-auto">
+            Get instant answers to your NRI tax queries in multiple languages
+          </p>
+        </div>
+
+        <Card className="max-w-4xl mx-auto">
+          <CardContent className="py-16 text-center">
+            <div className="mx-auto mb-4 flex size-14 items-center justify-center rounded-full bg-blue-100">
+              <Bot className="size-7 text-blue-600" />
+            </div>
+            <h3 className="text-2xl mb-2">Login to continue chat</h3>
+            <p className="text-gray-600 mb-6">
+              Please sign in to use the AI assistant and receive personalized responses.
+            </p>
+            <Button onClick={onRequireLogin}>Login / Sign Up</Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
       <div className="text-center mb-12">
@@ -128,16 +159,16 @@ export function AIChat({ onRequireLogin }: AIChatProps) {
         </p>
       </div>
 
-      <Card className="max-w-4xl mx-auto h-[600px] flex flex-col">
-        <CardHeader className="flex-shrink-0">
+      <Card className="max-w-4xl mx-auto h-[640px] flex flex-col border border-slate-200 shadow-lg overflow-hidden">
+        <CardHeader className="flex-shrink-0 border-b border-slate-200 bg-slate-50/70 backdrop-blur">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-blue-100 rounded-lg">
+              <div className="p-2 bg-blue-100 rounded-lg border border-blue-200">
                 <Bot className="size-6 text-blue-600" />
               </div>
               <div>
                 <CardTitle>AI Tax Assistant</CardTitle>
-                <CardDescription>Structured and Reliable Tax Guidance</CardDescription>
+                <CardDescription>Secure, structured tax guidance for NRIs</CardDescription>
               </div>
             </div>
 
@@ -155,9 +186,10 @@ export function AIChat({ onRequireLogin }: AIChatProps) {
           </div>
 
           <div className="flex items-center gap-2 mt-4">
-            <Languages className="size-4 text-gray-500" />
+            <Languages className="size-4 text-slate-500" />
+            <span className="text-sm text-slate-600">Language</span>
             <Select value={language} onValueChange={setLanguage}>
-              <SelectTrigger className="w-40">
+              <SelectTrigger className="w-44 bg-white border-slate-300">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -168,26 +200,27 @@ export function AIChat({ onRequireLogin }: AIChatProps) {
               </SelectContent>
             </Select>
           </div>
-          {!isAuthenticated && (
-            <p className="mt-3 rounded-md border border-amber-200 bg-amber-50 p-2 text-sm text-amber-800">
-              Login required to use AI chat.
-            </p>
-          )}
         </CardHeader>
 
-        <CardContent ref={chatContentRef} className="flex-1 overflow-y-auto space-y-4">
+        <CardContent
+          ref={chatContentRef}
+          className="flex-1 overflow-y-auto space-y-5 p-6 bg-gradient-to-b from-slate-50 to-white"
+        >
           {messages.map((message, index) => (
             <div
               key={index}
               className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}
             >
               <div
-                className={`max-w-[80%] rounded-lg px-4 py-3 text-sm leading-relaxed ${
+                className={`max-w-[82%] rounded-2xl px-4 py-3 text-sm leading-relaxed shadow-sm ${
                   message.role === "user"
-                    ? "bg-blue-600 text-white"
-                    : "bg-gray-100 text-gray-900 prose prose-sm max-w-none"
+                    ? "bg-blue-600 text-white border border-blue-500"
+                    : "bg-white text-slate-900 border border-slate-200 prose prose-sm max-w-none"
                 }`}
               >
+                <p className={`mb-1 text-[11px] uppercase tracking-wide ${message.role === "user" ? "text-blue-100" : "text-slate-500"}`}>
+                  {message.role === "user" ? "You" : "NRITAX AI"}
+                </p>
                 {message.role === "ai" ? (
                   <ReactMarkdown>{message.content}</ReactMarkdown>
                 ) : (
@@ -199,7 +232,8 @@ export function AIChat({ onRequireLogin }: AIChatProps) {
 
           {isTyping && (
             <div className="flex justify-start">
-              <div className="bg-gray-100 rounded-lg px-4 py-3">
+              <div className="bg-white border border-slate-200 rounded-2xl px-4 py-3 shadow-sm">
+                <p className="mb-2 text-[11px] uppercase tracking-wide text-slate-500">NRITAX AI</p>
                 <div className="flex gap-1">
                   <span className="size-2 bg-gray-400 rounded-full animate-bounce"></span>
                   <span className="size-2 bg-gray-400 rounded-full animate-bounce [animation-delay:0.2s]"></span>
@@ -210,18 +244,20 @@ export function AIChat({ onRequireLogin }: AIChatProps) {
           )}
         </CardContent>
 
-        <CardFooter className="flex-shrink-0">
-          <form onSubmit={handleSubmit} className="w-full flex gap-2">
+        <CardFooter className="flex-shrink-0 border-t border-slate-200 bg-white p-4">
+          <form
+            onSubmit={handleSubmit}
+            className="w-full flex items-end gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3"
+          >
             <Textarea
               placeholder="Ask about DTAA, NRI taxes, tax planning..."
               value={question}
               onChange={(e) => setQuestion(e.target.value)}
               onKeyDown={handleKeyDown}
-              className="resize-none"
-              rows={2}
-              disabled={!isAuthenticated}
+              className="resize-none min-h-[56px] border-0 bg-transparent focus-visible:ring-0"
+              rows={1}
             />
-            <Button type="submit" size="icon" className="flex-shrink-0 h-auto" disabled={!isAuthenticated}>
+            <Button type="submit" size="icon" className="flex-shrink-0 h-10 w-10 rounded-full">
               <Send className="size-5" />
             </Button>
           </form>

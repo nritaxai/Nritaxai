@@ -1,11 +1,20 @@
 import React, { useState } from "react";
 import axios from "axios";
+import { useSearchParams } from "react-router-dom";
+import { Badge } from "../components/ui/badge";
+import { Button } from "../components/ui/button";
+import { CheckCircle2, CreditCard, Lock, ReceiptText, ShieldCheck, Sparkles } from "lucide-react";
 
 type BillingType = "monthly" | "yearly";
+type PlanType = "pro" | "enterprise";
 type PromoCode = {
   code: string;
   discountPercent: number;
   description: string;
+};
+type UserPayload = {
+  name?: string;
+  email?: string;
 };
 
 const PROMO_CODES: PromoCode[] = [
@@ -14,6 +23,28 @@ const PROMO_CODES: PromoCode[] = [
   { code: "SANDBOXY25", discountPercent: 25, description: "25% off on yearly billing (test only)" },
   { code: "SANDBOX15", discountPercent: 15, description: "15% off on any plan (test only)" },
 ];
+
+const PLAN_META: Record<
+  PlanType,
+  { label: string; monthlyPrice: number; yearlyPrice: number; badge?: string }
+> = {
+  pro: {
+    label: "Professional Plan",
+    monthlyPrice: 29,
+    yearlyPrice: 319,
+    badge: "MOST POPULAR",
+  },
+  enterprise: {
+    label: "Enterprise Plan",
+    monthlyPrice: 99,
+    yearlyPrice: 1089,
+  },
+};
+
+const normalizePlan = (value: string | null): PlanType => {
+  if (value === "enterprise") return "enterprise";
+  return "pro";
+};
 
 const loadRazorpayScript = async () => {
   if ((window as any).Razorpay) return true;
@@ -31,9 +62,12 @@ interface CheckoutPageProps {
 }
 
 const CheckoutPage: React.FC<CheckoutPageProps> = ({ onRequireLogin }) => {
+  const [searchParams] = useSearchParams();
   const API = import.meta.env.VITE_API_URL;
   const isSandboxPromoMode =
     import.meta.env.DEV || import.meta.env.VITE_PROMO_MODE === "sandbox";
+
+  const [plan, setPlan] = useState<PlanType>(normalizePlan(searchParams.get("plan")));
   const [billing, setBilling] = useState<BillingType>("monthly");
   const [promo, setPromo] = useState<string>("");
   const [email, setEmail] = useState<string>("");
@@ -48,8 +82,10 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({ onRequireLogin }) => {
   const [promoError, setPromoError] = useState<string>("");
   const [checkoutError, setCheckoutError] = useState<string>("");
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
+  const [hasPrefilledUser, setHasPrefilledUser] = useState(false);
 
-  const price = billing === "monthly" ? 25 : 276;
+  const selectedPlan = PLAN_META[plan];
+  const price = billing === "monthly" ? selectedPlan.monthlyPrice : selectedPlan.yearlyPrice;
   const discountAmount = appliedPromo
     ? Number(((price * appliedPromo.discountPercent) / 100).toFixed(2))
     : 0;
@@ -58,8 +94,36 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({ onRequireLogin }) => {
   React.useEffect(() => {
     const syncAuth = () => setIsAuthenticated(Boolean(localStorage.getItem("token")));
     window.addEventListener("storage", syncAuth);
-    return () => window.removeEventListener("storage", syncAuth);
+    window.addEventListener("auth-changed", syncAuth);
+    return () => {
+      window.removeEventListener("storage", syncAuth);
+      window.removeEventListener("auth-changed", syncAuth);
+    };
   }, []);
+
+  React.useEffect(() => {
+    setPlan(normalizePlan(searchParams.get("plan")));
+  }, [searchParams]);
+
+  React.useEffect(() => {
+    if (!isAuthenticated) {
+      setHasPrefilledUser(false);
+      return;
+    }
+    if (hasPrefilledUser) return;
+
+    const storedUserRaw = localStorage.getItem("user");
+    if (!storedUserRaw) return;
+
+    try {
+      const storedUser = JSON.parse(storedUserRaw) as UserPayload;
+      setFullName((prev) => prev || storedUser.name || "");
+      setEmail((prev) => prev || storedUser.email || "");
+      setHasPrefilledUser(true);
+    } catch {
+      // Ignore malformed localStorage payload.
+    }
+  }, [isAuthenticated, hasPrefilledUser]);
 
   React.useEffect(() => {
     if (appliedPromo?.code === "SANDBOXY25" && billing !== "yearly") {
@@ -136,7 +200,7 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({ onRequireLogin }) => {
 
       const { data } = await axios.post(
         `${API}/api/subscription/create-subscription`,
-        { plan: "pro" },
+        { plan },
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -148,7 +212,7 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({ onRequireLogin }) => {
         key: data.razorpayKey || import.meta.env.VITE_RAZORPAY_KEY,
         subscription_id: data.id,
         name: "NRITAX.AI",
-        description: `Professional Plan (${billing})${appliedPromo ? ` - ${appliedPromo.code}` : ""}`,
+        description: `${selectedPlan.label} (${billing})${appliedPromo ? ` - ${appliedPromo.code}` : ""}`,
         prefill: {
           name: fullName,
           email,
@@ -187,215 +251,202 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({ onRequireLogin }) => {
 
   if (!isAuthenticated) {
     return (
-      <div className="min-h-screen bg-gray-50 py-12 px-6 flex items-center justify-center">
-        <div className="max-w-md w-full rounded-2xl bg-white shadow p-8 text-center">
-          <h1 className="text-2xl font-bold text-blue-600 mb-3">Login Required</h1>
-          <p className="text-gray-600 mb-6">
-            Please login to continue with subscription checkout.
+      <div className="min-h-screen bg-[radial-gradient(circle_at_top,_#dbeafe_0%,_#f8fafc_35%,_#ffffff_100%)] py-16 px-6 flex items-center justify-center">
+        <div className="max-w-md w-full rounded-2xl bg-white border border-slate-200 shadow-xl p-8 text-center">
+          <div className="mx-auto mb-4 size-14 rounded-full bg-blue-100 border border-blue-200 flex items-center justify-center">
+            <Lock className="size-7 text-blue-600" />
+          </div>
+          <h1 className="text-2xl font-semibold text-slate-900 mb-2">Login Required</h1>
+          <p className="text-slate-600 mb-6">
+            Please login to continue with secure subscription checkout.
           </p>
-          <button
-            onClick={onRequireLogin}
-            className="w-full bg-blue-600 text-white py-3 rounded-xl font-semibold hover:opacity-90 transition"
-          >
+          <Button onClick={onRequireLogin} className="w-full h-11 text-base">
             Login / Sign Up
-          </button>
+          </Button>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 py-12 px-6">
+    <div className="min-h-screen bg-[radial-gradient(circle_at_top,_#dbeafe_0%,_#f8fafc_35%,_#ffffff_100%)] py-12 px-4 sm:px-6">
       <div className="max-w-6xl mx-auto">
-        <h1 className="text-3xl font-bold text-center text-blue-600 mb-10">
-          Complete Your Purchase
-        </h1>
+        <div className="text-center mb-10">
+          <Badge className="bg-blue-100 text-blue-700 border-blue-200 mb-4">Secure Checkout</Badge>
+          <h1 className="text-3xl sm:text-4xl text-slate-900 tracking-tight mb-3">Complete Your Subscription</h1>
+          <p className="text-slate-600 max-w-2xl mx-auto">
+            Confirm your plan, enter billing details, and continue to secure Razorpay payment.
+          </p>
+        </div>
 
-        <div className="grid md:grid-cols-2 gap-8">
-          {/* ================= ORDER SUMMARY ================= */}
-          <div className="bg-white rounded-2xl shadow p-8">
-            <h2 className="text-lg font-semibold mb-6">Order Summary</h2>
-
-            <div className="flex items-center gap-3 mb-4">
-              <span className="text-blue-600 font-semibold">
-                Professional Plan
-              </span>
-              <span className="text-xs bg-blue-100 text-blue-600 px-2 py-1 rounded-full">
-                MOST POPULAR
-              </span>
+        <div className="grid lg:grid-cols-[1.05fr_1fr] gap-6 lg:gap-8 items-start">
+          <aside className="rounded-2xl border border-slate-200 bg-white shadow-lg p-6 sm:p-7 lg:sticky lg:top-24">
+            <div className="flex items-center gap-3 mb-5">
+              <div className="size-10 rounded-lg bg-slate-100 border border-slate-200 flex items-center justify-center">
+                <ReceiptText className="size-5 text-slate-700" />
+              </div>
+              <div>
+                <p className="text-sm text-slate-500">Order Summary</p>
+                <h2 className="text-lg font-semibold text-slate-900">{selectedPlan.label}</h2>
+              </div>
+              {selectedPlan.badge && (
+                <Badge className="ml-auto bg-blue-600 text-white">{selectedPlan.badge}</Badge>
+              )}
             </div>
 
-            {/* Billing Toggle */}
-            <div className="flex bg-gray-100 p-1 rounded-lg w-fit mb-6">
+            <div className="inline-flex bg-slate-100 p-1 rounded-xl mb-6">
               <button
+                type="button"
                 onClick={() => setBilling("monthly")}
-                className={`px-4 py-2 rounded-md text-sm font-medium transition ${
-                  billing === "monthly"
-                    ? "bg-blue-600 text-white"
-                    : "text-gray-600"
+                className={`px-4 py-2 rounded-lg text-sm font-medium transition ${
+                  billing === "monthly" ? "bg-white text-slate-900 shadow" : "text-slate-600"
                 }`}
               >
                 Monthly
               </button>
               <button
+                type="button"
                 onClick={() => setBilling("yearly")}
-                className={`px-4 py-2 rounded-md text-sm font-medium transition ${
-                  billing === "yearly"
-                    ? "bg-blue-600 text-white"
-                    : "text-gray-600"
+                className={`px-4 py-2 rounded-lg text-sm font-medium transition ${
+                  billing === "yearly" ? "bg-white text-slate-900 shadow" : "text-slate-600"
                 }`}
               >
                 Yearly
               </button>
             </div>
 
-            <div className="border-t pt-6 space-y-4">
-              <div className="flex justify-between text-gray-600">
-                <span>
-                  {billing === "monthly"
-                    ? "Monthly Subscription"
-                    : "Yearly Subscription"}
-                </span>
-                <span>${price}</span>
+            <div className="space-y-3 border-y border-slate-200 py-5">
+              <div className="flex items-center justify-between text-slate-600">
+                <span>{billing === "monthly" ? "Monthly Subscription" : "Yearly Subscription"}</span>
+                <span className="text-slate-900 font-medium">${price}</span>
               </div>
-
               {appliedPromo && (
-                <div className="flex justify-between text-green-700">
+                <div className="flex items-center justify-between text-emerald-700">
                   <span>Discount ({appliedPromo.code})</span>
                   <span>- ${discountAmount}</span>
                 </div>
               )}
-
-              <div className="flex justify-between font-semibold text-lg">
+              <div className="flex items-center justify-between text-lg font-semibold">
                 <span>Total</span>
                 <span className="text-blue-600">${finalTotal}</span>
               </div>
-
-              <p className="text-xs text-gray-400">
-                *Per month, billed {billing}
-              </p>
-              <p className="text-xs text-gray-400">
-                Sales tax may apply based on your location
-              </p>
             </div>
-          </div>
 
-          {/* ================= USER INFO ================= */}
-          <div className="bg-white rounded-2xl shadow p-8">
-            <h2 className="text-lg font-semibold mb-6">Your Information</h2>
+            <div className="mt-5 space-y-2 text-sm text-slate-600">
+              <p className="flex items-center gap-2"><CheckCircle2 className="size-4 text-emerald-600" /> Instant plan activation after payment</p>
+              <p className="flex items-center gap-2"><ShieldCheck className="size-4 text-emerald-600" /> Encrypted and secure checkout flow</p>
+              <p className="flex items-center gap-2"><CreditCard className="size-4 text-emerald-600" /> Powered by Razorpay</p>
+            </div>
+          </aside>
+
+          <section className="rounded-2xl border border-slate-200 bg-white shadow-lg p-6 sm:p-7">
+            <div className="flex items-center gap-3 mb-6">
+              <div className="size-10 rounded-lg bg-blue-100 border border-blue-200 flex items-center justify-center">
+                <Sparkles className="size-5 text-blue-700" />
+              </div>
+              <div>
+                <h2 className="text-lg font-semibold text-slate-900">Billing Information</h2>
+                <p className="text-sm text-slate-500">You can edit pre-filled details before payment.</p>
+              </div>
+            </div>
 
             <form className="space-y-5" onSubmit={handleProceedToPayment}>
-              <div>
-                <label className="block text-sm font-medium mb-1">
-                  Email *
-                </label>
-                <input
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="Enter your email"
-                  className="w-full border rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 outline-none"
-                />
+              <div className="grid sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1.5">Full Name *</label>
+                  <input
+                    type="text"
+                    value={fullName}
+                    onChange={(e) => setFullName(e.target.value)}
+                    placeholder="Enter your full name"
+                    className="w-full h-11 border border-slate-300 rounded-lg px-3.5 bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1.5">Email *</label>
+                  <input
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="Enter your email"
+                    className="w-full h-11 border border-slate-300 rounded-lg px-3.5 bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                  />
+                </div>
               </div>
 
-              <div>
-                <label className="block text-sm font-medium mb-1">
-                  Full Name *
-                </label>
-                <input
-                  type="text"
-                  value={fullName}
-                  onChange={(e) => setFullName(e.target.value)}
-                  placeholder="Enter your full name"
-                  className="w-full border rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 outline-none"
-                />
+              <div className="grid sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1.5">Phone *</label>
+                  <input
+                    type="tel"
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
+                    placeholder="+1 (555) 123-4567"
+                    className="w-full h-11 border border-slate-300 rounded-lg px-3.5 bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1.5">Company (optional)</label>
+                  <input
+                    type="text"
+                    value={company}
+                    onChange={(e) => setCompany(e.target.value)}
+                    placeholder="Your company name"
+                    className="w-full h-11 border border-slate-300 rounded-lg px-3.5 bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                  />
+                </div>
               </div>
 
-              <div>
-                <label className="block text-sm font-medium mb-1">
-                  Phone *
-                </label>
-                <input
-                  type="tel"
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                  placeholder="+1 (555) 123-4567"
-                  className="w-full border rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 outline-none"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium mb-1">
-                  Company (optional)
-                </label>
-                <input
-                  type="text"
-                  value={company}
-                  onChange={(e) => setCompany(e.target.value)}
-                  placeholder="Your company name"
-                  className="w-full border rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 outline-none"
-                />
-              </div>
-
-              {/* Promo Code */}
-              <div>
-                <label className="block text-sm font-medium mb-2">
-                  Promo Code
-                </label>
-                <div className="flex gap-3">
+              <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                <label className="block text-sm font-medium text-slate-700 mb-2">Promo Code</label>
+                <div className="flex gap-2">
                   <input
                     type="text"
                     value={promo}
                     onChange={(e) => setPromo(e.target.value)}
                     placeholder="ENTER PROMO CODE"
-                    className="flex-1 border rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 outline-none"
+                    className="flex-1 h-11 border border-slate-300 rounded-lg px-3.5 bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
                   />
-                  <button
-                    type="button"
-                    onClick={handleApplyPromo}
-                    className="bg-blue-600 text-white px-6 rounded-lg hover:bg-blue-700 transition"
-                  >
+                  <Button type="button" onClick={handleApplyPromo} className="h-11 px-5">
                     Apply
-                  </button>
+                  </Button>
                 </div>
-                {promoMessage && (
-                  <p className="text-sm text-green-700 mt-2">{promoMessage}</p>
-                )}
-                {promoError && (
-                  <p className="text-sm text-red-600 mt-2">{promoError}</p>
-                )}
-                <div className="mt-3 rounded-lg bg-gray-50 border p-3 text-xs text-gray-600">
-                  <p className="font-medium text-gray-700 mb-1">Sandbox promo codes (test only)</p>
-                  <p>SANDBOX10: 10% off on any plan</p>
-                  <p>SANDBOX20: 20% off on any plan</p>
-                  <p>SANDBOXY25: 25% off on yearly billing</p>
-                  <p>SANDBOX15: 15% off on any plan</p>
+
+                {promoMessage && <p className="text-sm text-emerald-700 mt-2">{promoMessage}</p>}
+                {promoError && <p className="text-sm text-red-600 mt-2">{promoError}</p>}
+
+                <div className="mt-3 text-xs text-slate-500 space-y-1">
+                  <p className="font-medium text-slate-700">Sandbox promo codes (test only)</p>
+                  <p>SANDBOX10, SANDBOX20, SANDBOXY25, SANDBOX15</p>
                   {!isSandboxPromoMode && (
-                    <p className="mt-2 text-amber-700">
+                    <p className="text-amber-700">
                       Disabled in live mode. Set `VITE_PROMO_MODE=sandbox` to enable.
                     </p>
                   )}
                 </div>
               </div>
 
-              {/* CTA */}
-              <button
-                type="submit"
-                disabled={isProcessingPayment}
-                className="w-full mt-4 bg-gradient-to-r from-blue-500 to-blue-600 text-white py-3 rounded-xl font-semibold hover:opacity-90 transition"
-              >
-                {isProcessingPayment ? "Starting Payment..." : "Continue to Payment"}
-              </button>
-
               {checkoutError && (
-                <p className="text-sm text-red-600 text-center">{checkoutError}</p>
+                <p className="text-sm text-red-600 rounded-lg bg-red-50 border border-red-200 p-3">
+                  {checkoutError}
+                </p>
               )}
 
-              <p className="text-xs text-gray-400 text-center">
+              <Button
+                type="submit"
+                disabled={isProcessingPayment}
+                className="w-full h-12 text-base"
+              >
+                {isProcessingPayment ? "Starting Payment..." : `Pay $${finalTotal} Securely`}
+              </Button>
+
+              <p className="text-xs text-center text-slate-500">
                 You will be redirected to secure Razorpay checkout.
               </p>
             </form>
-          </div>
+          </section>
         </div>
       </div>
     </div>

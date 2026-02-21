@@ -154,6 +154,27 @@ export function Calculators({ onRequireLogin }: CalculatorsProps) {
     };
   }, [rentalIncome, isAuthenticated, onRequireLogin]);
 
+  if (!isAuthenticated) {
+    return (
+      <div className="min-h-screen bg-gray-50 py-16">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+          <Card className="rounded-2xl border border-slate-200 shadow-lg">
+            <CardContent className="py-16 text-center">
+              <div className="mx-auto mb-4 flex size-14 items-center justify-center rounded-full bg-blue-100 border border-blue-200">
+                <Calculator className="size-7 text-blue-600" />
+              </div>
+              <h1 className="text-3xl sm:text-4xl text-slate-900 mb-3">Login to continue calculation</h1>
+              <p className="text-slate-600 max-w-2xl mx-auto mb-7">
+                Please sign in to access income tax, capital gains, and rental income calculators.
+              </p>
+              <Button onClick={onRequireLogin}>Login / Sign Up</Button>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gray-50 py-16">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -168,12 +189,6 @@ export function Calculators({ onRequireLogin }: CalculatorsProps) {
         </div>
 
         <Tabs defaultValue="income" className="max-w-4xl mx-auto">
-          {!isAuthenticated && (
-            <div className="mb-4 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800 flex items-center justify-between gap-3">
-              <span>Please login to use tax calculators.</span>
-              <Button onClick={onRequireLogin}>Login</Button>
-            </div>
-          )}
           <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="income">Income Tax</TabsTrigger>
             <TabsTrigger value="capital-gains">Capital Gains</TabsTrigger>

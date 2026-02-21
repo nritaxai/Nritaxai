@@ -31,7 +31,12 @@ app.use(
 
 app.use(
   cors({
-    origin: ["http://localhost:5173", "https://nritaxai-cw9w.vercel.app","https://www.nritax.ai"],
+    origin: [
+      "http://localhost:5173",
+      "https://nritaxai-cw9w.vercel.app",
+      "https://nritax.ai",
+      "https://www.nritax.ai",
+    ],
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"],
     credentials: true,

@@ -3,6 +3,7 @@ import { protect } from "../Middlewares/authMiddleware.js";
 import {
   cancelSubscription,
   createSubscription,
+  getRazorpayDebugConfig,
   getSubscriptionStatus,
   razorpayWebhook,
   verifySubscriptionPayment,
@@ -15,6 +16,7 @@ router.post("/create-subscription", protect, createSubscription);
 router.post("/verify-subscription", protect, verifySubscriptionPayment);
 router.get("/status", protect, getSubscriptionStatus);
 router.post("/cancel", protect, cancelSubscription);
+router.get("/debug-config", protect, getRazorpayDebugConfig);
 
 // Razorpay webhook (public route, called by Razorpay)
 router.post("/razorpay-webhook", razorpayWebhook);

@@ -9,7 +9,6 @@ import {
 import { Globe, Menu, LogIn, LogOut, Calculator } from "lucide-react";
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
-import { Pricing } from "../pages/Pricing";
 
 
 interface HeaderProps {
@@ -42,9 +41,11 @@ export function Header({ onAskAI, onLogin }: HeaderProps) {
 
   // Listen for login/logout changes
   window.addEventListener("storage", loadUser);
+  window.addEventListener("auth-changed", loadUser);
 
   return () => {
     window.removeEventListener("storage", loadUser);
+    window.removeEventListener("auth-changed", loadUser);
   };
 }, []);
 
@@ -96,7 +97,7 @@ export function Header({ onAskAI, onLogin }: HeaderProps) {
               to="/pricing"
               className="flex items-center gap-1 text-gray-700 hover:text-blue-600 transition-colors"
             >
-              pricing
+              Pricing
             </Link>
             <Link
               to="/#compliance"
@@ -157,7 +158,6 @@ export function Header({ onAskAI, onLogin }: HeaderProps) {
         </div>
 
         {/* Mobile Navigation */}
-        {/* Mobile Navigation */}
         {mobileMenuOpen && (
           <div className="md:hidden py-4 space-y-3">
 
@@ -183,6 +183,14 @@ export function Header({ onAskAI, onLogin }: HeaderProps) {
               onClick={() => setMobileMenuOpen(false)}
             >
               AI Chat
+            </Link>
+
+            <Link
+              to="/pricing"
+              className="block text-gray-700 hover:text-blue-600 transition-colors"
+              onClick={() => setMobileMenuOpen(false)}
+            >
+              Pricing
             </Link>
 
             <Link

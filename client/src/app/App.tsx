@@ -13,7 +13,8 @@ import { LoginModal } from "./components/LoginModal";
 
 import { Calculators } from "./pages/Calculators";
 import { Pricing } from "./pages/Pricing";
-import CheckoutPage from "./pages/CheckoutPage"; // ✅ Correct file name
+import { Login } from "./pages/Login";
+import CheckoutPage from "./pages/CheckoutPage";
 
 export default function App() {
   const [showCPAContact, setShowCPAContact] = useState(false);
@@ -57,7 +58,6 @@ export default function App() {
       />
 
       <Routes>
-        {/* Landing Page */}
         <Route
           path="/"
           element={
@@ -86,16 +86,17 @@ export default function App() {
           }
         />
 
-        {/* Other Pages */}
         <Route
           path="/calculators"
           element={<Calculators onRequireLogin={() => setShowLoginModal(true)} />}
         />
+        <Route path="/pricing" element={<Pricing />} />
         <Route path="/Pricing" element={<Pricing />} />
         <Route
           path="/checkout"
           element={<CheckoutPage onRequireLogin={() => setShowLoginModal(true)} />}
         />
+        <Route path="/login" element={<Login />} />
       </Routes>
 
       <Footer />

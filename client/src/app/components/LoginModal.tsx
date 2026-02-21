@@ -41,6 +41,34 @@ export function LoginModal({ onClose }: LoginModalProps) {
     type: "success" | "error";
   } | null>(null);
 
+  const resolveAuthUser = (response: any) =>
+    response?.user || response?.data?.user || response?.data || null;
+
+  const handleAuthSuccess = (response: any, message: string) => {
+    const token = response?.token;
+    const user = resolveAuthUser(response);
+
+    if (!token || !user) {
+      throw new Error("Invalid authentication response");
+    }
+
+    localStorage.setItem("token", token);
+    localStorage.setItem("user", JSON.stringify(user));
+
+    setPopup({
+      message,
+      type: "success",
+    });
+
+    window.dispatchEvent(new Event("storage"));
+    window.dispatchEvent(new Event("auth-changed"));
+
+    setTimeout(() => {
+      setPopup(null);
+      onClose();
+    }, 800);
+  };
+
   // ================= LOGIN =================
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -49,22 +77,8 @@ export function LoginModal({ onClose }: LoginModalProps) {
 
     try {
       const response = await loginUser(loginData);
-
-      localStorage.setItem("token", response.token);
-      localStorage.setItem("user", JSON.stringify(response.user));
-
-
-      setPopup({
-        message: `Welcome back, ${response.user.name}!`,
-        type: "success",
-      });
-
-      setTimeout(() => {
-        setPopup(null);
-        onClose();
-      }, 2000);
-
-      window.dispatchEvent(new Event("storage"));
+      const user = resolveAuthUser(response);
+      handleAuthSuccess(response, `Welcome back, ${user?.name || "User"}!`);
 
     } catch (err: any) {
       setPopup({
@@ -92,23 +106,11 @@ export function LoginModal({ onClose }: LoginModalProps) {
 
     try {
       const response = await signupUser(signupData);
-
-
-      localStorage.setItem("token", response.token);
-      localStorage.setItem("user", JSON.stringify(response.data));
-
-      setPopup({
-        message: `Account created successfully! Welcome ${response.data.name}`,
-        type: "success",
-      });
-
-      setTimeout(() => {
-        setPopup(null);
-        onClose();
-      }, 2000);
-
-
-      window.dispatchEvent(new Event("storage"));
+      const user = resolveAuthUser(response);
+      handleAuthSuccess(
+        response,
+        `Account created successfully! Welcome ${user?.name || "User"}`
+      );
     } catch (err: any) {
       setPopup({
         message: err.response?.data?.message || "Signup failed",
@@ -208,24 +210,18 @@ export function LoginModal({ onClose }: LoginModalProps) {
                    text="signin_with"
                     onSuccess={async (credentialResponse) => {
                       try {
+                        if (!credentialResponse.credential) {
+                          throw new Error("Missing Google credential");
+                        }
+
                         const response = await googleLoginUser(
-                          credentialResponse.credential!
+                          credentialResponse.credential
                         );
-
-                        localStorage.setItem("token", response.token);
-                        localStorage.setItem("user", JSON.stringify(response.user));
-
-                        setPopup({
-                          message: `Welcome ${response.user.name}!`,
-                          type: "success",
-                        });
-
-                        setTimeout(() => {
-                          setPopup(null);
-                          onClose();
-                        }, 2000);
-
-                        window.dispatchEvent(new Event("storage"));
+                        const user = resolveAuthUser(response);
+                        handleAuthSuccess(
+                          response,
+                          `Welcome ${user?.name || "User"}!`
+                        );
                       } catch (err: any) {
                         setPopup({
                           message: err.response?.data?.message || "Google login failed",
@@ -353,24 +349,18 @@ export function LoginModal({ onClose }: LoginModalProps) {
                     text="signup_with"
                     onSuccess={async (credentialResponse) => {
                       try {
+                        if (!credentialResponse.credential) {
+                          throw new Error("Missing Google credential");
+                        }
+
                         const response = await googleLoginUser(
-                          credentialResponse.credential!
+                          credentialResponse.credential
                         );
-
-                        localStorage.setItem("token", response.token);
-                        localStorage.setItem("user", JSON.stringify(response.user));
-
-                        setPopup({
-                          message: `Account created successfully! Welcome ${response.user.name}`,
-                          type: "success",
-                        });
-
-                        setTimeout(() => {
-                          setPopup(null);
-                          onClose();
-                        }, 2000);
-
-                        window.dispatchEvent(new Event("storage"));
+                        const user = resolveAuthUser(response);
+                        handleAuthSuccess(
+                          response,
+                          `Account created successfully! Welcome ${user?.name || "User"}`
+                        );
                       } catch (err: any) {
                         setPopup({
                           message: err.response?.data?.message || "Google signup failed",
