@@ -8,7 +8,7 @@ import {
 } from "./ui/select";
 import { Globe, Menu, LogIn, LogOut, Calculator } from "lucide-react";
 import { useState, useEffect } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 
 
 interface HeaderProps {
@@ -22,6 +22,7 @@ interface User {
 }
 
 export function Header({ onAskAI, onLogin }: HeaderProps) {
+  const navigate = useNavigate();
   const [language, setLanguage] = useState("en");
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [user, setUser] = useState<User | null>(null);
@@ -53,7 +54,10 @@ export function Header({ onAskAI, onLogin }: HeaderProps) {
   const handleLogout = () => {
     localStorage.removeItem("token");
     localStorage.removeItem("user");
-    window.location.reload();
+    window.dispatchEvent(new Event("storage"));
+    window.dispatchEvent(new Event("auth-changed"));
+    setMobileMenuOpen(false);
+    navigate("/", { replace: true });
   };
 
   return (
